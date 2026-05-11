@@ -1,0 +1,18 @@
+# Local server logs
+server*.log
+research-html-lab/server*.log
+
+# Runtime caches
+__pycache__/
+.pytest_cache/
+.cache/
+
+# Frontend dependencies/build outputs, if added later
+node_modules/
+dist/
+build/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PVM-Raman-SLM 科研展示</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Local Research Dashboard</p>
+        <h1>原位转晶在线监测汇报面板</h1>
+      </div>
+      <div class="header-actions" aria-label="页面操作">
+        <button id="reloadExample" type="button">加载示例数据</button>
+        <button id="exportSummary" type="button">导出结论 JSON</button>
+      </div>
+    </header>
+
+    <nav class="tabbar" aria-label="展示章节">
+      <button class="tab active" type="button" data-tab="overview">总览</button>
+      <button class="tab" type="button" data-tab="pvm">PVM 图像终点</button>
+      <button class="tab" type="button" data-tab="alignment">图像-Raman 对齐</button>
+      <button class="tab" type="button" data-tab="slm">SLM 标定</button>
+    </nav>
+
+    <main class="slide-stage">
+      <section class="slide-panel active" id="overview" aria-labelledby="overview-title">
+        <div class="section-title">
+          <p class="eyebrow">Endpoint Summary</p>
+          <h2 id="overview-title">PVM 与 Raman 终点结论</h2>
+        </div>
+
+        <div class="metrics-grid">
+          <article class="metric">
+            <span>图像终点</span>
+            <strong id="pvmEndpoint">-- min</strong>
+            <small>block_frequency 持续低于阈值且无回弹</small>
+          </article>
+          <article class="metric">
+            <span>Raman 终点</span>
+            <strong id="ramanEndpoint">-- min</strong>
+            <small>1624 cm^-1 平台期、斜率和波动判定</small>
+          </article>
+          <article class="metric">
+            <span>时间差</span>
+            <strong id="endpointDelta">-- min</strong>
+            <small>Raman 终点 - 图像终点</small>
+          </article>
+          <article class="metric">
+            <span>数据状态</span>
+            <strong id="dataStatus">等待加载</strong>
+            <small id="dataRows">CSV: -- 行</small>
+          </article>
+        </div>
+
+        <div class="chart-block">
+          <canvas id="overviewChart" width="1280" height="620" aria-label="PVM 与 Raman 时间轴对齐图"></canvas>
+        </div>
+      </section>
+
+      <section class="slide-panel" id="pvm" aria-labelledby="pvm-title">
+        <div class="section-title">
+          <p class="eyebrow">PVM Image Analysis</p>
+          <h2 id="pvm-title">block / urchin 数量统计与图像终点判定</h2>
+        </div>
+
+        <div class="two-column">
+          <div class="chart-block">
+            <canvas id="pvmChart" width="980" height="620" aria-label="PVM block_frequency 曲线"></canvas>
+          </div>
+          <aside class="insight-panel">
+            <h3>判定逻辑</h3>
+            <ul>
+              <li>以 `block_frequency` 为主指标。</li>
+              <li>滑动窗口连续低于阈值。</li>
+              <li>终点后无明显回弹。</li>
+              <li>如果 CSV 提供 `endpoint_min`，优先用于展示并同时保留自动判定。</li>
+            </ul>
+            <div class="image-strip" id="pvmImages" aria-label="PVM 示例图像"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="slide-panel" id="alignment" aria-labelledby="alignment-title">
+        <div class="section-title">
+          <p class="eyebrow">Raman Alignment</p>
+          <h2 id="alignment-title">Raman 1624 cm^-1 曲线与图像终点对齐</h2>
+        </div>
+
+        <div class="chart-block large">
+          <canvas id="alignmentChart" width="1280" height="650" aria-label="图像终点与 Raman 终点对齐图"></canvas>
+        </div>
+
+        <div class="conclusion-line" id="alignmentConclusion">
+          等待数据加载后生成对齐结论。
+        </div>
+      </section>
+
+      <section class="slide-panel" id="slm" aria-labelledby="slm-title">
+        <div class="section-title">
+          <p class="eyebrow">SLM Calibration</p>
+          <h2 id="slm-title">SLM 波长、灰度与光栅周期标定展示</h2>
+        </div>
+
+        <div class="two-column">
+          <div class="chart-block">
+            <canvas id="slmChart" width="980" height="620" aria-label="SLM 标定曲线"></canvas>
+          </div>
+          <aside class="insight-panel">
+            <h3>标定结果</h3>
+            <div class="slm-list" id="slmList"></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <section class="data-tools" aria-label="数据导入">
+      <div>
+        <label for="pvmCsv">PVM/Raman CSV</label>
+        <input id="pvmCsv" type="file" accept=".csv,text/csv" />
+      </div>
+      <div>
+        <label for="slmCsv">SLM CSV</label>
+        <input id="slmCsv" type="file" accept=".csv,text/csv" />
+      </div>
+      <p id="messageBox" role="status">默认读取 `./data/example_pvm_raman.csv` 与 `./data/example_slm.csv`。</p>
+    </section>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

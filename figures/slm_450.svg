@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="SLM 450 nm grating">
+  <rect width="320" height="180" fill="#f8fbff"/>
+  <g fill="#2563eb" opacity=".78">
+    <rect x="28" y="24" width="12" height="132"/>
+    <rect x="64" y="24" width="12" height="132"/>
+    <rect x="100" y="24" width="12" height="132"/>
+    <rect x="136" y="24" width="12" height="132"/>
+    <rect x="172" y="24" width="12" height="132"/>
+    <rect x="208" y="24" width="12" height="132"/>
+    <rect x="244" y="24" width="12" height="132"/>
+    <rect x="280" y="24" width="12" height="132"/>
+  </g>
+  <text x="18" y="168" fill="#18212f" font-family="Arial" font-size="18">450 nm / 18 px</text>
+</svg>

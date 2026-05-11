@@ -1,0 +1,4 @@
+wavelength_nm,gray_value,grating_period_px,image_path,conclusion
+450,72,18,figures/slm_450.svg,450 nm 下灰度 72 与 18 px 光栅周期匹配，一级衍射清晰。
+532,96,24,figures/slm_532.svg,532 nm 下灰度 96 与 24 px 光栅周期匹配，亮度和条纹稳定。
+640,128,30,figures/slm_640.svg,640 nm 下灰度 128 与 30 px 光栅周期匹配，可作为红光通道标定参考。

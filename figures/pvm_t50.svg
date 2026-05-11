@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="PVM 50 min schematic">
+  <rect width="320" height="180" fill="#eef2f7"/>
+  <g fill="none" stroke="#0f8f72" stroke-width="4" opacity=".95">
+    <path d="M38 118c34-38 72-38 106 0"/>
+    <path d="M140 106c30-32 62-32 94 0"/>
+    <path d="M226 124c18-20 38-20 56 0"/>
+  </g>
+  <circle cx="80" cy="64" r="5" fill="#4f5d75" opacity=".35"/>
+  <circle cx="238" cy="58" r="4" fill="#4f5d75" opacity=".35"/>
+  <text x="18" y="162" fill="#18212f" font-family="Arial" font-size="18">50 min: stable urchin</text>
+</svg>

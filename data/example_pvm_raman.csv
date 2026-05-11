@@ -1,0 +1,14 @@
+time_min,block_count,total_count,block_frequency,threshold,endpoint_min,intensity_1624,raman_endpoint_min,image_path
+0,162,210,0.771,0.120,35,2850,40,figures/pvm_t00.svg
+5,151,214,0.706,0.120,35,2610,40,figures/pvm_t00.svg
+10,130,219,0.594,0.120,35,2310,40,figures/pvm_t20.svg
+15,103,223,0.462,0.120,35,2025,40,figures/pvm_t20.svg
+20,74,226,0.327,0.120,35,1740,40,figures/pvm_t20.svg
+25,46,229,0.201,0.120,35,1510,40,figures/pvm_t35.svg
+30,31,231,0.134,0.120,35,1340,40,figures/pvm_t35.svg
+35,21,232,0.091,0.120,35,1252,40,figures/pvm_t35.svg
+40,18,234,0.077,0.120,35,1214,40,figures/pvm_t50.svg
+45,17,236,0.072,0.120,35,1206,40,figures/pvm_t50.svg
+50,16,237,0.068,0.120,35,1202,40,figures/pvm_t50.svg
+55,16,239,0.067,0.120,35,1198,40,figures/pvm_t50.svg
+60,15,241,0.062,0.120,35,1201,40,figures/pvm_t50.svg

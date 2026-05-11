@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="PVM 35 min schematic">
+  <rect width="320" height="180" fill="#eef2f7"/>
+  <g fill="#4f5d75" opacity=".45">
+    <rect x="48" y="54" width="34" height="16" rx="4"/>
+    <rect x="226" y="48" width="32" height="14" rx="4"/>
+  </g>
+  <g fill="none" stroke="#0f8f72" stroke-width="4" opacity=".9">
+    <path d="M46 120c28-34 62-34 92 0"/>
+    <path d="M152 108c22-26 48-26 72 0"/>
+    <path d="M228 126c16-18 34-18 50 0"/>
+  </g>
+  <text x="18" y="162" fill="#18212f" font-family="Arial" font-size="18">35 min: image endpoint</text>
+</svg>
