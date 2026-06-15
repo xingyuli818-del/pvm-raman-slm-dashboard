@@ -30,7 +30,18 @@ $ErrorActionPreference = "SilentlyContinue"
 $dataDir = Join-Path $env:LOCALAPPDATA "CodexTodoWidget"
 $dataPath = Join-Path $dataDir "tasks.json"
 $settingsPath = Join-Path $dataDir "settings.json"
+$logPath = Join-Path $dataDir "widget.log"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+
+function Write-WidgetLog {
+  param([string]$Message)
+
+  try {
+    $line = "{0}`t{1}" -f [DateTime]::Now.ToString("s"), $Message
+    Add-Content -LiteralPath $logPath -Value $line -Encoding UTF8
+  } catch {
+  }
+}
 
 function Get-DesktopHostHandle {
   $progman = [DesktopHostApi]::FindWindow("Progman", $null)
@@ -109,7 +120,9 @@ function Load-Tasks {
 function Save-Tasks {
   param([array]$Tasks)
 
-  $Tasks | ConvertTo-Json -Depth 5 | Set-Content -Path $dataPath -Encoding UTF8
+  $json = ConvertTo-Json -InputObject @($Tasks) -Depth 5
+  $encoding = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($dataPath, $json, $encoding)
 }
 
 function Set-TaskDueDate {
@@ -283,29 +296,30 @@ $closeButton.Anchor = "Top,Right"
 $closeButton.Add_Click({ $form.Close() })
 $headerPanel.Controls.Add($closeButton)
 
-$input = New-Object System.Windows.Forms.TextBox
-$input.Location = New-Object System.Drawing.Point(14, 54)
-$input.Width = 166
-$input.Height = 30
-$input.Anchor = "Top,Left,Right"
-$input.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-$input.BackColor = [System.Drawing.Color]::FromArgb(236, 243, 247)
-$input.ForeColor = [System.Drawing.Color]::FromArgb(30, 39, 52)
-$form.Controls.Add($input)
+$taskInput = New-Object System.Windows.Forms.TextBox
+$taskInput.Location = New-Object System.Drawing.Point(14, 54)
+$taskInput.Width = 292
+$taskInput.Height = 30
+$taskInput.Anchor = "Top,Left,Right"
+$taskInput.Name = "TaskInput"
+$taskInput.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$taskInput.BackColor = [System.Drawing.Color]::FromArgb(236, 243, 247)
+$taskInput.ForeColor = [System.Drawing.Color]::FromArgb(30, 39, 52)
+$form.Controls.Add($taskInput)
 
 $dueCheck = New-Object System.Windows.Forms.CheckBox
 $dueCheck.Text = "截止"
 $dueCheck.Checked = $false
 $dueCheck.AutoSize = $true
-$dueCheck.Location = New-Object System.Drawing.Point(186, 59)
-$dueCheck.Anchor = "Top,Right"
+$dueCheck.Location = New-Object System.Drawing.Point(14, 94)
+$dueCheck.Anchor = "Top,Left"
 $dueCheck.BackColor = $form.BackColor
 $dueCheck.ForeColor = [System.Drawing.Color]::FromArgb(235, 242, 247)
 $form.Controls.Add($dueCheck)
 
 $duePicker = New-Object System.Windows.Forms.DateTimePicker
-$duePicker.Location = New-Object System.Drawing.Point(236, 54)
-$duePicker.Width = 84
+$duePicker.Location = New-Object System.Drawing.Point(76, 89)
+$duePicker.Width = 108
 $duePicker.Height = 30
 $duePicker.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
 $duePicker.CustomFormat = "MM-dd"
@@ -320,8 +334,9 @@ $dueCheck.Add_CheckedChanged({
 
 $addButton = New-Object System.Windows.Forms.Button
 $addButton.Text = "添加"
-$addButton.Location = New-Object System.Drawing.Point(328, 53)
-$addButton.Width = 78
+$addButton.Name = "AddTaskButton"
+$addButton.Location = New-Object System.Drawing.Point(314, 53)
+$addButton.Width = 92
 $addButton.Height = 31
 $addButton.Anchor = "Top,Right"
 $addButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -329,11 +344,12 @@ $addButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(160, 18
 $addButton.BackColor = [System.Drawing.Color]::FromArgb(207, 222, 230)
 $addButton.ForeColor = [System.Drawing.Color]::FromArgb(25, 35, 48)
 $form.Controls.Add($addButton)
+$form.AcceptButton = $addButton
 
 $list = New-Object System.Windows.Forms.ListView
-$list.Location = New-Object System.Drawing.Point(14, 94)
+$list.Location = New-Object System.Drawing.Point(14, 130)
 $list.Width = 392
-$list.Height = 274
+$list.Height = 238
 $list.Anchor = "Top,Bottom,Left,Right"
 $list.View = "Details"
 $list.CheckBoxes = $true
@@ -430,21 +446,42 @@ function Render-Tasks {
 }
 
 function Add-TaskFromInput {
-  $title = $input.Text.Trim()
-  if ([string]::IsNullOrWhiteSpace($title)) {
-    return
-  }
+  $previousErrorPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Stop"
 
-  $dueDate = ""
-  if ($dueCheck.Checked) {
-    $dueDate = $duePicker.Value.ToString("yyyy-MM-dd")
-  }
+  try {
+    $title = $taskInput.Text.Trim()
+    Write-WidgetLog -Message ("add-request title-length={0}" -f $title.Length)
 
-  $script:tasks = @((New-Task -Title $title -DueDate $dueDate)) + @($script:tasks)
-  $input.Text = ""
-  Save-Tasks -Tasks $script:tasks
-  Render-Tasks
-  $input.Focus()
+    if ([string]::IsNullOrWhiteSpace($title)) {
+      $taskInput.Focus()
+      return
+    }
+
+    $dueDate = ""
+    if ($dueCheck.Checked) {
+      $dueDate = $duePicker.Value.ToString("yyyy-MM-dd")
+    }
+
+    $newTask = New-Task -Title $title -DueDate $dueDate
+    $script:tasks = @($newTask) + @($script:tasks)
+    Save-Tasks -Tasks $script:tasks
+    Render-Tasks
+    $taskInput.Text = ""
+    $taskInput.Focus()
+    Write-WidgetLog -Message ("add-success count={0}" -f @($script:tasks).Count)
+  } catch {
+    $message = $_.Exception.Message
+    Write-WidgetLog -Message ("add-failed {0}" -f $message)
+    [System.Windows.Forms.MessageBox]::Show(
+      "添加失败：$message`r`n`r`n日志位置：$logPath",
+      "桌面待办",
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Warning
+    ) | Out-Null
+  } finally {
+    $ErrorActionPreference = $previousErrorPreference
+  }
 }
 
 function Edit-TaskDueDate {
@@ -523,7 +560,7 @@ function Open-SelectedTaskDueDateEditor {
 
 $addButton.Add_Click({ Add-TaskFromInput })
 
-$input.Add_KeyDown({
+$taskInput.Add_KeyDown({
   param($sender, $event)
   if ($event.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
     Add-TaskFromInput
