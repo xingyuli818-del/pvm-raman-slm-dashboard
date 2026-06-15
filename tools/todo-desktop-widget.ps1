@@ -113,13 +113,35 @@ function Save-Tasks {
 }
 
 function New-Task {
-  param([string]$Title)
+  param(
+    [string]$Title,
+    [string]$DueDate
+  )
 
   [pscustomobject]@{
     id = New-TaskId
     title = $Title
+    dueDate = $DueDate
     done = $false
     createdAt = [DateTime]::Now.ToString("s")
+  }
+}
+
+function Format-DueDate {
+  param($Task)
+
+  if ($null -eq $Task.PSObject.Properties["dueDate"]) {
+    return "--"
+  }
+
+  if ([string]::IsNullOrWhiteSpace([string]$Task.dueDate)) {
+    return "--"
+  }
+
+  try {
+    return ([DateTime]::Parse([string]$Task.dueDate)).ToString("MM-dd")
+  } catch {
+    return [string]$Task.dueDate
   }
 }
 
@@ -129,9 +151,9 @@ $isRendering = $false
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "桌面待办"
-$form.Width = 330
-$form.Height = 468
-$form.MinimumSize = New-Object System.Drawing.Size(300, 390)
+$form.Width = 420
+$form.Height = 500
+$form.MinimumSize = New-Object System.Drawing.Size(390, 420)
 $form.StartPosition = "Manual"
 $form.TopMost = $false
 $form.ShowInTaskbar = $false
@@ -209,7 +231,7 @@ $pinCheck = New-Object System.Windows.Forms.CheckBox
 $pinCheck.Text = "置顶"
 $pinCheck.Checked = $false
 $pinCheck.AutoSize = $true
-$pinCheck.Location = New-Object System.Drawing.Point(228, 18)
+$pinCheck.Location = New-Object System.Drawing.Point(318, 18)
 $pinCheck.BackColor = $form.BackColor
 $pinCheck.ForeColor = [System.Drawing.Color]::FromArgb(235, 242, 247)
 $pinCheck.Add_CheckedChanged({
@@ -223,7 +245,7 @@ $closeButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $closeButton.FlatAppearance.BorderSize = 0
 $closeButton.BackColor = $form.BackColor
 $closeButton.ForeColor = [System.Drawing.Color]::FromArgb(230, 238, 244)
-$closeButton.Location = New-Object System.Drawing.Point(294, 10)
+$closeButton.Location = New-Object System.Drawing.Point(384, 10)
 $closeButton.Width = 24
 $closeButton.Height = 24
 $closeButton.Anchor = "Top,Right"
@@ -232,7 +254,7 @@ $headerPanel.Controls.Add($closeButton)
 
 $input = New-Object System.Windows.Forms.TextBox
 $input.Location = New-Object System.Drawing.Point(14, 54)
-$input.Width = 214
+$input.Width = 250
 $input.Height = 30
 $input.Anchor = "Top,Left,Right"
 $input.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
@@ -240,9 +262,33 @@ $input.BackColor = [System.Drawing.Color]::FromArgb(236, 243, 247)
 $input.ForeColor = [System.Drawing.Color]::FromArgb(30, 39, 52)
 $form.Controls.Add($input)
 
+$duePicker = New-Object System.Windows.Forms.DateTimePicker
+$duePicker.Location = New-Object System.Drawing.Point(272, 54)
+$duePicker.Width = 82
+$duePicker.Height = 30
+$duePicker.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
+$duePicker.CustomFormat = "MM-dd"
+$duePicker.CalendarTitleBackColor = [System.Drawing.Color]::FromArgb(70, 92, 102)
+$duePicker.Anchor = "Top,Right"
+$form.Controls.Add($duePicker)
+
+$noDueCheck = New-Object System.Windows.Forms.CheckBox
+$noDueCheck.Text = "无"
+$noDueCheck.Checked = $true
+$noDueCheck.AutoSize = $true
+$noDueCheck.Location = New-Object System.Drawing.Point(358, 59)
+$noDueCheck.Anchor = "Top,Right"
+$noDueCheck.BackColor = $form.BackColor
+$noDueCheck.ForeColor = [System.Drawing.Color]::FromArgb(235, 242, 247)
+$noDueCheck.Add_CheckedChanged({
+  $duePicker.Enabled = -not $noDueCheck.Checked
+})
+$duePicker.Enabled = -not $noDueCheck.Checked
+$form.Controls.Add($noDueCheck)
+
 $addButton = New-Object System.Windows.Forms.Button
 $addButton.Text = "添加"
-$addButton.Location = New-Object System.Drawing.Point(238, 53)
+$addButton.Location = New-Object System.Drawing.Point(328, 88)
 $addButton.Width = 78
 $addButton.Height = 31
 $addButton.Anchor = "Top,Right"
@@ -253,9 +299,9 @@ $addButton.ForeColor = [System.Drawing.Color]::FromArgb(25, 35, 48)
 $form.Controls.Add($addButton)
 
 $list = New-Object System.Windows.Forms.ListView
-$list.Location = New-Object System.Drawing.Point(14, 94)
-$list.Width = 302
-$list.Height = 248
+$list.Location = New-Object System.Drawing.Point(14, 130)
+$list.Width = 392
+$list.Height = 238
 $list.Anchor = "Top,Bottom,Left,Right"
 $list.View = "Details"
 $list.CheckBoxes = $true
@@ -264,14 +310,15 @@ $list.HideSelection = $false
 $list.BorderStyle = [System.Windows.Forms.BorderStyle]::None
 $list.BackColor = [System.Drawing.Color]::FromArgb(218, 230, 237)
 $list.ForeColor = [System.Drawing.Color]::FromArgb(22, 31, 43)
-$list.Columns.Add("任务", 224) | Out-Null
+$list.Columns.Add("任务", 210) | Out-Null
+$list.Columns.Add("完成截止日期", 112) | Out-Null
 $list.Columns.Add("状态", 58) | Out-Null
 $form.Controls.Add($list)
 
 $countLabel = New-Object System.Windows.Forms.Label
 $countLabel.Text = "未完成 0 / 已完成 0"
 $countLabel.AutoSize = $true
-$countLabel.Location = New-Object System.Drawing.Point(14, 354)
+$countLabel.Location = New-Object System.Drawing.Point(14, 380)
 $countLabel.Anchor = "Bottom,Left"
 $countLabel.BackColor = $form.BackColor
 $countLabel.ForeColor = [System.Drawing.Color]::FromArgb(235, 242, 247)
@@ -279,7 +326,7 @@ $form.Controls.Add($countLabel)
 
 $deleteSelectedButton = New-Object System.Windows.Forms.Button
 $deleteSelectedButton.Text = "删选中"
-$deleteSelectedButton.Location = New-Object System.Drawing.Point(14, 382)
+$deleteSelectedButton.Location = New-Object System.Drawing.Point(14, 410)
 $deleteSelectedButton.Width = 82
 $deleteSelectedButton.Height = 32
 $deleteSelectedButton.Anchor = "Bottom,Left"
@@ -291,7 +338,7 @@ $form.Controls.Add($deleteSelectedButton)
 
 $clearDoneButton = New-Object System.Windows.Forms.Button
 $clearDoneButton.Text = "清已完成"
-$clearDoneButton.Location = New-Object System.Drawing.Point(104, 382)
+$clearDoneButton.Location = New-Object System.Drawing.Point(104, 410)
 $clearDoneButton.Width = 92
 $clearDoneButton.Height = 32
 $clearDoneButton.Anchor = "Bottom,Left"
@@ -303,7 +350,7 @@ $form.Controls.Add($clearDoneButton)
 
 $openFullButton = New-Object System.Windows.Forms.Button
 $openFullButton.Text = "打开完整版"
-$openFullButton.Location = New-Object System.Drawing.Point(204, 382)
+$openFullButton.Location = New-Object System.Drawing.Point(294, 410)
 $openFullButton.Width = 112
 $openFullButton.Height = 32
 $openFullButton.Anchor = "Bottom,Right"
@@ -321,6 +368,7 @@ function Render-Tasks {
   foreach ($task in $script:tasks) {
     $status = if ($task.done) { "完成" } else { "待办" }
     $item = New-Object System.Windows.Forms.ListViewItem($task.title)
+    $item.SubItems.Add((Format-DueDate -Task $task)) | Out-Null
     $item.SubItems.Add($status) | Out-Null
     $item.Checked = [bool]$task.done
     $item.Tag = $task.id
@@ -343,7 +391,12 @@ function Add-TaskFromInput {
     return
   }
 
-  $script:tasks = @((New-Task -Title $title)) + @($script:tasks)
+  $dueDate = ""
+  if (-not $noDueCheck.Checked) {
+    $dueDate = $duePicker.Value.ToString("yyyy-MM-dd")
+  }
+
+  $script:tasks = @((New-Task -Title $title -DueDate $dueDate)) + @($script:tasks)
   $input.Text = ""
   Save-Tasks -Tasks $script:tasks
   Render-Tasks
@@ -432,6 +485,7 @@ $form.Add_FormClosing({
 
 Render-Tasks
 [void]$form.ShowDialog()
+
 
 
 
