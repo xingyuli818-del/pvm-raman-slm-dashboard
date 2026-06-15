@@ -1,11 +1,86 @@
 ﻿Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+if (-not ([System.Management.Automation.PSTypeName]"DesktopHostApi").Type) {
+  Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class DesktopHostApi {
+  [DllImport("user32.dll", SetLastError=true)]
+  public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+  [DllImport("user32.dll", SetLastError=true)]
+  public static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
+
+  [DllImport("user32.dll", SetLastError=true)]
+  public static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
+
+  [DllImport("user32.dll", SetLastError=true)]
+  public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+  [DllImport("user32.dll", SetLastError=true)]
+  public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+}
+"@
+}
+
 $ErrorActionPreference = "SilentlyContinue"
 
 $dataDir = Join-Path $env:LOCALAPPDATA "CodexTodoWidget"
 $dataPath = Join-Path $dataDir "tasks.json"
+$settingsPath = Join-Path $dataDir "settings.json"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+
+function Get-DesktopHostHandle {
+  $progman = [DesktopHostApi]::FindWindow("Progman", $null)
+  if ($progman -ne [IntPtr]::Zero) {
+    [UIntPtr]$result = [UIntPtr]::Zero
+    [DesktopHostApi]::SendMessageTimeout($progman, 0x052C, [UIntPtr]::Zero, [IntPtr]::Zero, 0, 1000, [ref]$result) | Out-Null
+  }
+
+  $worker = [IntPtr]::Zero
+  do {
+    $worker = [DesktopHostApi]::FindWindowEx([IntPtr]::Zero, $worker, "WorkerW", $null)
+    if ($worker -eq [IntPtr]::Zero) {
+      break
+    }
+
+    $defView = [DesktopHostApi]::FindWindowEx($worker, [IntPtr]::Zero, "SHELLDLL_DefView", $null)
+    if ($defView -ne [IntPtr]::Zero) {
+      return $worker
+    }
+  } while ($true)
+
+  return $progman
+}
+
+function Load-Settings {
+  if (-not (Test-Path -Path $settingsPath)) {
+    return [pscustomobject]@{}
+  }
+
+  try {
+    $raw = Get-Content -Path $settingsPath -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+      return [pscustomobject]@{}
+    }
+    return ConvertFrom-Json $raw
+  } catch {
+    return [pscustomobject]@{}
+  }
+}
+
+function Save-Settings {
+  param([System.Windows.Forms.Form]$Form)
+
+  [pscustomobject]@{
+    x = $Form.Location.X
+    y = $Form.Location.Y
+    width = $Form.Width
+    height = $Form.Height
+  } | ConvertTo-Json -Depth 3 | Set-Content -Path $settingsPath -Encoding UTF8
+}
 
 function New-TaskId {
   return "task-{0}-{1}" -f ([DateTimeOffset]::Now.ToUnixTimeMilliseconds()), (Get-Random -Minimum 1000 -Maximum 9999)
@@ -49,6 +124,7 @@ function New-Task {
 }
 
 $tasks = @(Load-Tasks)
+$settings = Load-Settings
 $isRendering = $false
 
 $form = New-Object System.Windows.Forms.Form
@@ -60,12 +136,23 @@ $form.StartPosition = "Manual"
 $form.TopMost = $false
 $form.ShowInTaskbar = $false
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-$form.Opacity = 0.86
-$form.BackColor = [System.Drawing.Color]::FromArgb(243, 246, 250)
+$form.Opacity = 0.74
+$form.BackColor = [System.Drawing.Color]::FromArgb(70, 92, 102)
 $form.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
 
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+if ($settings.PSObject.Properties.Name -contains "x" -and $settings.PSObject.Properties.Name -contains "y") {
+  $form.Location = New-Object System.Drawing.Point([int]$settings.x, [int]$settings.y)
+} else {
 $form.Location = New-Object System.Drawing.Point(($screen.Right - $form.Width - 22), ($screen.Top + 72))
+}
+
+$form.Add_Paint({
+  param($sender, $event)
+  $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(150, 170, 195, 205), 1)
+  $event.Graphics.DrawRectangle($pen, 0, 0, $form.Width - 1, $form.Height - 1)
+  $pen.Dispose()
+})
 
 $dragging = $false
 $dragStart = New-Object System.Drawing.Point(0, 0)
@@ -92,6 +179,7 @@ $dragMouseMove = {
 
 $dragMouseUp = {
   $script:dragging = $false
+  Save-Settings -Form $form
 }
 
 $headerPanel = New-Object System.Windows.Forms.Panel
@@ -110,7 +198,7 @@ $titleLabel.Text = "今日待办"
 $titleLabel.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 13, [System.Drawing.FontStyle]::Bold)
 $titleLabel.AutoSize = $true
 $titleLabel.Location = New-Object System.Drawing.Point(14, 15)
-$titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(32, 41, 57)
+$titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(245, 249, 252)
 $titleLabel.BackColor = $form.BackColor
 $titleLabel.Add_MouseDown($dragMouseDown)
 $titleLabel.Add_MouseMove($dragMouseMove)
@@ -123,7 +211,7 @@ $pinCheck.Checked = $false
 $pinCheck.AutoSize = $true
 $pinCheck.Location = New-Object System.Drawing.Point(228, 18)
 $pinCheck.BackColor = $form.BackColor
-$pinCheck.ForeColor = [System.Drawing.Color]::FromArgb(82, 96, 115)
+$pinCheck.ForeColor = [System.Drawing.Color]::FromArgb(235, 242, 247)
 $pinCheck.Add_CheckedChanged({
   $form.TopMost = $pinCheck.Checked
 })
@@ -134,7 +222,7 @@ $closeButton.Text = "×"
 $closeButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $closeButton.FlatAppearance.BorderSize = 0
 $closeButton.BackColor = $form.BackColor
-$closeButton.ForeColor = [System.Drawing.Color]::FromArgb(100, 116, 139)
+$closeButton.ForeColor = [System.Drawing.Color]::FromArgb(230, 238, 244)
 $closeButton.Location = New-Object System.Drawing.Point(294, 10)
 $closeButton.Width = 24
 $closeButton.Height = 24
@@ -148,7 +236,8 @@ $input.Width = 214
 $input.Height = 30
 $input.Anchor = "Top,Left,Right"
 $input.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-$input.BackColor = [System.Drawing.Color]::FromArgb(250, 252, 255)
+$input.BackColor = [System.Drawing.Color]::FromArgb(236, 243, 247)
+$input.ForeColor = [System.Drawing.Color]::FromArgb(30, 39, 52)
 $form.Controls.Add($input)
 
 $addButton = New-Object System.Windows.Forms.Button
@@ -158,8 +247,9 @@ $addButton.Width = 78
 $addButton.Height = 31
 $addButton.Anchor = "Top,Right"
 $addButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$addButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(210, 218, 229)
-$addButton.BackColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
+$addButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(160, 182, 195)
+$addButton.BackColor = [System.Drawing.Color]::FromArgb(207, 222, 230)
+$addButton.ForeColor = [System.Drawing.Color]::FromArgb(25, 35, 48)
 $form.Controls.Add($addButton)
 
 $list = New-Object System.Windows.Forms.ListView
@@ -172,8 +262,8 @@ $list.CheckBoxes = $true
 $list.FullRowSelect = $true
 $list.HideSelection = $false
 $list.BorderStyle = [System.Windows.Forms.BorderStyle]::None
-$list.BackColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
-$list.ForeColor = [System.Drawing.Color]::FromArgb(32, 41, 57)
+$list.BackColor = [System.Drawing.Color]::FromArgb(218, 230, 237)
+$list.ForeColor = [System.Drawing.Color]::FromArgb(22, 31, 43)
 $list.Columns.Add("任务", 224) | Out-Null
 $list.Columns.Add("状态", 58) | Out-Null
 $form.Controls.Add($list)
@@ -184,7 +274,7 @@ $countLabel.AutoSize = $true
 $countLabel.Location = New-Object System.Drawing.Point(14, 354)
 $countLabel.Anchor = "Bottom,Left"
 $countLabel.BackColor = $form.BackColor
-$countLabel.ForeColor = [System.Drawing.Color]::FromArgb(82, 96, 115)
+$countLabel.ForeColor = [System.Drawing.Color]::FromArgb(235, 242, 247)
 $form.Controls.Add($countLabel)
 
 $deleteSelectedButton = New-Object System.Windows.Forms.Button
@@ -194,8 +284,9 @@ $deleteSelectedButton.Width = 82
 $deleteSelectedButton.Height = 32
 $deleteSelectedButton.Anchor = "Bottom,Left"
 $deleteSelectedButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$deleteSelectedButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(214, 222, 232)
-$deleteSelectedButton.BackColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
+$deleteSelectedButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(160, 182, 195)
+$deleteSelectedButton.BackColor = [System.Drawing.Color]::FromArgb(207, 222, 230)
+$deleteSelectedButton.ForeColor = [System.Drawing.Color]::FromArgb(25, 35, 48)
 $form.Controls.Add($deleteSelectedButton)
 
 $clearDoneButton = New-Object System.Windows.Forms.Button
@@ -205,8 +296,9 @@ $clearDoneButton.Width = 92
 $clearDoneButton.Height = 32
 $clearDoneButton.Anchor = "Bottom,Left"
 $clearDoneButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$clearDoneButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(214, 222, 232)
-$clearDoneButton.BackColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
+$clearDoneButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(160, 182, 195)
+$clearDoneButton.BackColor = [System.Drawing.Color]::FromArgb(207, 222, 230)
+$clearDoneButton.ForeColor = [System.Drawing.Color]::FromArgb(25, 35, 48)
 $form.Controls.Add($clearDoneButton)
 
 $openFullButton = New-Object System.Windows.Forms.Button
@@ -216,8 +308,9 @@ $openFullButton.Width = 112
 $openFullButton.Height = 32
 $openFullButton.Anchor = "Bottom,Right"
 $openFullButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$openFullButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(214, 222, 232)
-$openFullButton.BackColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
+$openFullButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(160, 182, 195)
+$openFullButton.BackColor = [System.Drawing.Color]::FromArgb(207, 222, 230)
+$openFullButton.ForeColor = [System.Drawing.Color]::FromArgb(25, 35, 48)
 $form.Controls.Add($openFullButton)
 
 function Render-Tasks {
@@ -316,12 +409,31 @@ $openFullButton.Add_Click({
   }
 })
 
+$form.Add_Shown({
+  $desktopHost = Get-DesktopHostHandle
+  if ($desktopHost -ne [IntPtr]::Zero) {
+    [DesktopHostApi]::SetParent($form.Handle, $desktopHost) | Out-Null
+    [DesktopHostApi]::SetWindowPos(
+      $form.Handle,
+      [IntPtr]1,
+      $form.Location.X,
+      $form.Location.Y,
+      $form.Width,
+      $form.Height,
+      0x0040 -bor 0x0010
+    ) | Out-Null
+  }
+})
+
 $form.Add_FormClosing({
   Save-Tasks -Tasks $script:tasks
+  Save-Settings -Form $form
 })
 
 Render-Tasks
 [void]$form.ShowDialog()
+
+
 
 
 
