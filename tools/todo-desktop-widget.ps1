@@ -112,6 +112,37 @@ function Save-Tasks {
   $Tasks | ConvertTo-Json -Depth 5 | Set-Content -Path $dataPath -Encoding UTF8
 }
 
+function Set-TaskDueDate {
+  param(
+    $Task,
+    [string]$DueDate
+  )
+
+  if ($null -eq $Task.PSObject.Properties["dueDate"]) {
+    $Task | Add-Member -NotePropertyName dueDate -NotePropertyValue $DueDate
+    return
+  }
+
+  $Task.dueDate = $DueDate
+}
+
+function Ensure-TaskSchema {
+  param([array]$Tasks)
+
+  foreach ($task in $Tasks) {
+    $dueDate = ""
+    if ($null -ne $task.PSObject.Properties["dueDate"]) {
+      $dueDate = [string]$task.dueDate
+    }
+    Set-TaskDueDate -Task $task -DueDate $dueDate
+    if ($null -eq $task.PSObject.Properties["done"]) {
+      $task | Add-Member -NotePropertyName done -NotePropertyValue $false
+    }
+  }
+
+  return @($Tasks)
+}
+
 function New-Task {
   param(
     [string]$Title,
@@ -145,7 +176,7 @@ function Format-DueDate {
   }
 }
 
-$tasks = @(Load-Tasks)
+$tasks = @(Ensure-TaskSchema -Tasks @(Load-Tasks))
 $settings = Load-Settings
 $isRendering = $false
 
@@ -254,7 +285,7 @@ $headerPanel.Controls.Add($closeButton)
 
 $input = New-Object System.Windows.Forms.TextBox
 $input.Location = New-Object System.Drawing.Point(14, 54)
-$input.Width = 250
+$input.Width = 166
 $input.Height = 30
 $input.Anchor = "Top,Left,Right"
 $input.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
@@ -262,33 +293,34 @@ $input.BackColor = [System.Drawing.Color]::FromArgb(236, 243, 247)
 $input.ForeColor = [System.Drawing.Color]::FromArgb(30, 39, 52)
 $form.Controls.Add($input)
 
+$dueCheck = New-Object System.Windows.Forms.CheckBox
+$dueCheck.Text = "截止"
+$dueCheck.Checked = $false
+$dueCheck.AutoSize = $true
+$dueCheck.Location = New-Object System.Drawing.Point(186, 59)
+$dueCheck.Anchor = "Top,Right"
+$dueCheck.BackColor = $form.BackColor
+$dueCheck.ForeColor = [System.Drawing.Color]::FromArgb(235, 242, 247)
+$form.Controls.Add($dueCheck)
+
 $duePicker = New-Object System.Windows.Forms.DateTimePicker
-$duePicker.Location = New-Object System.Drawing.Point(272, 54)
-$duePicker.Width = 82
+$duePicker.Location = New-Object System.Drawing.Point(236, 54)
+$duePicker.Width = 84
 $duePicker.Height = 30
 $duePicker.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
 $duePicker.CustomFormat = "MM-dd"
+$duePicker.Enabled = $false
 $duePicker.CalendarTitleBackColor = [System.Drawing.Color]::FromArgb(70, 92, 102)
 $duePicker.Anchor = "Top,Right"
 $form.Controls.Add($duePicker)
 
-$noDueCheck = New-Object System.Windows.Forms.CheckBox
-$noDueCheck.Text = "无"
-$noDueCheck.Checked = $true
-$noDueCheck.AutoSize = $true
-$noDueCheck.Location = New-Object System.Drawing.Point(358, 59)
-$noDueCheck.Anchor = "Top,Right"
-$noDueCheck.BackColor = $form.BackColor
-$noDueCheck.ForeColor = [System.Drawing.Color]::FromArgb(235, 242, 247)
-$noDueCheck.Add_CheckedChanged({
-  $duePicker.Enabled = -not $noDueCheck.Checked
+$dueCheck.Add_CheckedChanged({
+  $duePicker.Enabled = $dueCheck.Checked
 })
-$duePicker.Enabled = -not $noDueCheck.Checked
-$form.Controls.Add($noDueCheck)
 
 $addButton = New-Object System.Windows.Forms.Button
 $addButton.Text = "添加"
-$addButton.Location = New-Object System.Drawing.Point(328, 88)
+$addButton.Location = New-Object System.Drawing.Point(328, 53)
 $addButton.Width = 78
 $addButton.Height = 31
 $addButton.Anchor = "Top,Right"
@@ -299,9 +331,9 @@ $addButton.ForeColor = [System.Drawing.Color]::FromArgb(25, 35, 48)
 $form.Controls.Add($addButton)
 
 $list = New-Object System.Windows.Forms.ListView
-$list.Location = New-Object System.Drawing.Point(14, 130)
+$list.Location = New-Object System.Drawing.Point(14, 94)
 $list.Width = 392
-$list.Height = 238
+$list.Height = 274
 $list.Anchor = "Top,Bottom,Left,Right"
 $list.View = "Details"
 $list.CheckBoxes = $true
@@ -348,6 +380,18 @@ $clearDoneButton.BackColor = [System.Drawing.Color]::FromArgb(207, 222, 230)
 $clearDoneButton.ForeColor = [System.Drawing.Color]::FromArgb(25, 35, 48)
 $form.Controls.Add($clearDoneButton)
 
+$editDueButton = New-Object System.Windows.Forms.Button
+$editDueButton.Text = "改日期"
+$editDueButton.Location = New-Object System.Drawing.Point(210, 410)
+$editDueButton.Width = 78
+$editDueButton.Height = 32
+$editDueButton.Anchor = "Bottom,Right"
+$editDueButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$editDueButton.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(160, 182, 195)
+$editDueButton.BackColor = [System.Drawing.Color]::FromArgb(207, 222, 230)
+$editDueButton.ForeColor = [System.Drawing.Color]::FromArgb(25, 35, 48)
+$form.Controls.Add($editDueButton)
+
 $openFullButton = New-Object System.Windows.Forms.Button
 $openFullButton.Text = "打开完整版"
 $openFullButton.Location = New-Object System.Drawing.Point(294, 410)
@@ -392,7 +436,7 @@ function Add-TaskFromInput {
   }
 
   $dueDate = ""
-  if (-not $noDueCheck.Checked) {
+  if ($dueCheck.Checked) {
     $dueDate = $duePicker.Value.ToString("yyyy-MM-dd")
   }
 
@@ -401,6 +445,80 @@ function Add-TaskFromInput {
   Save-Tasks -Tasks $script:tasks
   Render-Tasks
   $input.Focus()
+}
+
+function Edit-TaskDueDate {
+  param($TaskId)
+
+  $task = $script:tasks | Where-Object { $_.id -eq $TaskId } | Select-Object -First 1
+  if ($null -eq $task) {
+    return
+  }
+
+  $dialog = New-Object System.Windows.Forms.Form
+  $dialog.Text = "修改截止日期"
+  $dialog.Width = 280
+  $dialog.Height = 150
+  $dialog.StartPosition = "CenterScreen"
+  $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+  $dialog.MaximizeBox = $false
+  $dialog.MinimizeBox = $false
+  $dialog.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
+
+  $label = New-Object System.Windows.Forms.Label
+  $label.Text = "完成截止日期"
+  $label.AutoSize = $true
+  $label.Location = New-Object System.Drawing.Point(16, 18)
+  $dialog.Controls.Add($label)
+
+  $editPicker = New-Object System.Windows.Forms.DateTimePicker
+  $editPicker.Location = New-Object System.Drawing.Point(16, 44)
+  $editPicker.Width = 230
+  $editPicker.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
+  $editPicker.CustomFormat = "yyyy-MM-dd"
+  $hasDue = $task.PSObject.Properties.Name -contains "dueDate" -and -not [string]::IsNullOrWhiteSpace([string]$task.dueDate)
+  if ($hasDue) {
+    try {
+      $editPicker.Value = [DateTime]::Parse([string]$task.dueDate)
+    } catch {
+      $editPicker.Value = [DateTime]::Today
+    }
+  }
+  $dialog.Controls.Add($editPicker)
+
+  $clearButton = New-Object System.Windows.Forms.Button
+  $clearButton.Text = "无截止"
+  $clearButton.Location = New-Object System.Drawing.Point(16, 78)
+  $clearButton.Width = 76
+  $clearButton.Add_Click({
+    Set-TaskDueDate -Task $task -DueDate ""
+    Save-Tasks -Tasks $script:tasks
+    Render-Tasks
+    $dialog.Close()
+  })
+  $dialog.Controls.Add($clearButton)
+
+  $okButton = New-Object System.Windows.Forms.Button
+  $okButton.Text = "保存"
+  $okButton.Location = New-Object System.Drawing.Point(170, 78)
+  $okButton.Width = 76
+  $okButton.Add_Click({
+    Set-TaskDueDate -Task $task -DueDate $editPicker.Value.ToString("yyyy-MM-dd")
+    Save-Tasks -Tasks $script:tasks
+    Render-Tasks
+    $dialog.Close()
+  })
+  $dialog.Controls.Add($okButton)
+
+  [void]$dialog.ShowDialog($form)
+}
+
+function Open-SelectedTaskDueDateEditor {
+  if ($list.SelectedItems.Count -eq 0) {
+    return
+  }
+
+  Edit-TaskDueDate -TaskId $list.SelectedItems[0].Tag
 }
 
 $addButton.Add_Click({ Add-TaskFromInput })
@@ -428,6 +546,12 @@ $list.Add_ItemChecked({
   Save-Tasks -Tasks $script:tasks
   Render-Tasks
 })
+
+$list.Add_DoubleClick({
+  Open-SelectedTaskDueDateEditor
+})
+
+$editDueButton.Add_Click({ Open-SelectedTaskDueDateEditor })
 
 $deleteSelectedButton.Add_Click({
   $ids = @()
