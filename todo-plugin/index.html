@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>本地待办插件</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="任务清单">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">✓</span>
+          <div>
+            <p class="eyebrow">Local Todo</p>
+            <h1>待办插件</h1>
+          </div>
+        </div>
+
+        <form class="list-form" id="listForm">
+          <label for="listName">新建清单</label>
+          <div class="inline-field">
+            <input id="listName" name="listName" type="text" placeholder="例如：组会任务" autocomplete="off" />
+            <button class="icon-button" type="submit" title="添加清单" aria-label="添加清单">+</button>
+          </div>
+        </form>
+
+        <nav class="list-nav" id="listNav" aria-label="清单列表"></nav>
+
+        <section class="summary" aria-label="统计">
+          <div>
+            <span>未完成</span>
+            <strong id="openCount">0</strong>
+          </div>
+          <div>
+            <span>已完成</span>
+            <strong id="doneCount">0</strong>
+          </div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="currentListLabel">任务清单</p>
+            <h2 id="currentListTitle">今日任务</h2>
+          </div>
+          <div class="topbar-actions">
+            <button id="exportButton" type="button">导出</button>
+            <label class="file-button" for="importFile">导入</label>
+            <input id="importFile" type="file" accept="application/json,.json" />
+          </div>
+        </header>
+
+        <form class="task-form" id="taskForm">
+          <div class="form-grid">
+            <label>
+              <span>任务内容</span>
+              <input id="taskTitle" name="taskTitle" type="text" placeholder="输入一项待办事项" required />
+            </label>
+            <label>
+              <span>截止日期</span>
+              <input id="taskDue" name="taskDue" type="date" />
+            </label>
+            <label>
+              <span>优先级</span>
+              <select id="taskPriority" name="taskPriority">
+                <option value="normal">普通</option>
+                <option value="high">重要</option>
+                <option value="low">低优先级</option>
+              </select>
+            </label>
+          </div>
+          <label class="note-field">
+            <span>备注</span>
+            <textarea id="taskNote" name="taskNote" rows="2" placeholder="可写实验编号、文件路径、会议提醒等"></textarea>
+          </label>
+          <button class="primary-button" type="submit">添加任务</button>
+        </form>
+
+        <section class="toolbar" aria-label="筛选和操作">
+          <div class="segments" role="group" aria-label="任务状态筛选">
+            <button class="segment active" type="button" data-filter="all">全部</button>
+            <button class="segment" type="button" data-filter="open">未完成</button>
+            <button class="segment" type="button" data-filter="done">已完成</button>
+          </div>
+          <div class="toolbar-actions">
+            <button id="clearDoneButton" type="button">清空已完成</button>
+            <button id="resetButton" type="button">恢复示例</button>
+          </div>
+        </section>
+
+        <section class="task-board" id="taskBoard" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <template id="taskTemplate">
+      <article class="task-card">
+        <label class="check-wrap">
+          <input class="task-check" type="checkbox" />
+          <span class="fake-check" aria-hidden="true"></span>
+        </label>
+        <div class="task-content">
+          <div class="task-line">
+            <input class="task-title-input" type="text" />
+            <span class="priority-badge"></span>
+          </div>
+          <textarea class="task-note-input" rows="2"></textarea>
+          <div class="task-meta">
+            <span class="due-text"></span>
+            <span class="created-text"></span>
+          </div>
+        </div>
+        <button class="icon-button danger remove-task" type="button" title="删除任务" aria-label="删除任务">×</button>
+      </article>
+    </template>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
